@@ -463,7 +463,13 @@ function scheda(icona, titolo, ...contenuto) {
   return crea('article', { class: 'scheda' }, crea('h2', {}, crea('span', { class: 'ico', text: icona }), titolo), ...contenuto);
 }
 
-const origine = t => crea('p', { class: 'origine', text: 'Fonte: ' + t });
+// Riga «Fonte»: accetta testi semplici o collegamenti {t, u}; ignora i valori vuoti
+function origine(...parti) {
+  const voci = parti.filter(Boolean).map(x => typeof x === 'string' ? x
+    : /^https:\/\//.test(x.u) ? crea('a', { href: x.u, target: '_blank', rel: 'noopener noreferrer', text: x.t }) : x.t);
+  const pezzi = voci.flatMap((x, i) => i ? [' · ', x] : [x]);
+  return crea('p', { class: 'origine' }, 'Fonte: ', pezzi.length ? pezzi : '—');
+}
 
 // Testi inglesi: nascono con un segnaposto e vengono sostituiti dalla traduzione italiana (vedi traduciPagina)
 function riga(testoEn) {
@@ -520,6 +526,23 @@ function disegna(d) {
   const { q, animale, wiki, sc, reaz, simili, studi, stato, candidati, nomi } = d;
   const out = [];
 
+  // Collegamenti alle fonti realmente usate
+  const e = encodeURIComponent;
+  const nome = (d.nomeFDA || (nomi && nomi[0]) || q).replace(/"/g, '');
+  const inEn = !!wiki && wiki.lang === 'en';
+  const nomeSegn = ((reaz && reaz.nome) || nome).replace(/"/g, '');   // lo stesso nome con cui sono calcolate le percentuali
+  const L = {
+    wiki: wiki && wiki.url ? { t: inEn ? 'Wikipedia (tradotto dall\'inglese)' : 'Wikipedia (italiano)', u: wiki.url } : null,
+    fda: { t: 'FDA – DailyMed, scheda ufficiale (tradotta automaticamente dall\'inglese)', u: `https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=${e(nome)}` },
+    segn: { t: animale ? 'openFDA – segnalazioni veterinarie (dati)' : 'openFDA – segnalazioni di reazioni (dati)',
+      u: animale ? `https://api.fda.gov/animalandveterinary/event.json?search=drug.active_ingredients.name:%22${e(nomeSegn)}%22&count=reaction.veddra_term_name.exact&limit=20`
+        : `https://api.fda.gov/drug/event.json?search=patient.drug.openfda.generic_name:%22${e(nomeSegn)}%22&count=patient.reaction.reactionmeddrapt.exact&limit=20` },
+    pubmed: { t: 'PubMed (titoli tradotti)', u: `https://pubmed.ncbi.nlm.nih.gov/?term=${e(nome)}` },
+    revisioni: { t: 'PubMed – revisioni sugli effetti indesiderati', u: `https://pubmed.ncbi.nlm.nih.gov/?term=${e(nome + ' adverse effects management review')}` },
+    rx: { t: 'RxNav (NIH)', u: `https://mor.nlm.nih.gov/RxNav/search?searchBy=String&searchTerm=${e(nome)}` },
+    atc: simili && simili.atc ? { t: 'Classificazione ATC (OMS)', u: `https://atcddd.fhi.no/atc_ddd_index/?code=${e(simili.atc)}` } : null,
+  };
+
   if (candidati && candidati.length > 1) {
     out.push(crea('div', { class: 'alternative' }, 'Forse cercavi anche:',
       candidati.filter(c => c !== wiki?.titolo).slice(0, 5).map(c => crea('button', { type: 'button', 'data-q': c, text: c }))));
@@ -533,13 +556,13 @@ function disegna(d) {
     principi.length ? crea('p', { class: 'sotto', text: (principi.length > 1 ? 'Principi attivi: ' : 'Principio attivo: ') + principi.join(', ') }) : null,
     sc && sc.marchi.length ? crea('div', { class: 'etichette' }, sc.marchi.map(m => crea('span', { class: 'etichetta', text: m }))) : null,
     wiki ? testoBlocco(wiki.intro, wiki.lang === 'en', 420) : crea('p', { class: 'vuoto', text: 'Nessuna descrizione trovata.' }),
-    origine([wiki && (wiki.lang === 'en' ? 'Wikipedia (tradotto dall\'inglese)' : 'Wikipedia'), sc && 'FDA (schede USA)'].filter(Boolean).join(' · ') || '—')));
+    origine(L.wiki, sc && L.fda)));
 
   // 2. Meccanismo d'azione
   const wen = !!wiki && wiki.lang === 'en';
   const mecc = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.meccanismo) : '';
   out.push(scheda('⚙️', 'Meccanismo d\'azione', testoBlocco(mecc || (sc && sc.meccanismo), mecc ? wen : true, 650),
-    origine(mecc ? (wen ? 'Wikipedia (tradotto dall\'inglese)' : 'Wikipedia (italiano)') : 'FDA (tradotto automaticamente dall\'inglese)')));
+    origine(mecc ? L.wiki : (sc && L.fda))));
 
   // 3. Modo d'uso
   const doseWiki = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.dose) : '';
@@ -547,7 +570,7 @@ function disegna(d) {
   out.push(scheda('💊', 'Modo d\'uso', testoBlocco(dose, doseWiki ? wen : true, 650),
     sc && sc.via.length ? crea('p', { class: 'sotto' }, 'Via di somministrazione: ', riga(sc.via.join(', ').toLowerCase())) : null,
     crea('p', { class: 'nota', text: 'La dose giusta dipende da età, peso e condizioni: segui sempre il foglietto illustrativo e il parere di medico, farmacista o veterinario. Unità di misura, intervalli e divieti vanno sempre controllati sul foglietto: una traduzione automatica può sbagliare.' }),
-    origine(doseWiki ? (wen ? 'Wikipedia (tradotto automaticamente dall\'inglese)' : 'Wikipedia (italiano)') : 'FDA (tradotto automaticamente dall\'inglese)')));
+    origine(doseWiki ? L.wiki : (sc && L.fda))));
 
   // 4. A cosa serve + percentuali di efficacia
   const usoWiki = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.uso) : '';
@@ -560,8 +583,8 @@ function disegna(d) {
       : crea('p', { class: 'nota', text: 'Una percentuale di efficacia affidabile non è disponibile come dato aperto: dipende da malattia, dose e popolazione. Qui sotto trovi gli studi principali, dove leggerla con il contesto giusto.' }),
     studi ? crea('div', {}, crea('p', { class: 'sotto', text: `Studi sperimentali e revisioni su PubMed: ${studi.totale.toLocaleString('it-IT')}. I più rilevanti:` }),
       crea('ul', { class: 'pulito' }, studi.articoli.map(a => crea('li', {},
-        crea('a', { href: `https://pubmed.ncbi.nlm.nih.gov/${a.id}/`, target: '_blank', rel: 'noopener noreferrer' }, riga(a.titolo)), ` (${a.rivista}, ${a.anno})`)))) : null,
-    origine(usoWiki ? (wen ? 'Wikipedia (tradotto automaticamente dall\'inglese)' : 'Wikipedia (italiano)') : 'FDA (tradotto automaticamente dall\'inglese) · PubMed (titoli tradotti)')));
+        crea('a', { href: /^\d+$/.test(a.id) ? `https://pubmed.ncbi.nlm.nih.gov/${a.id}/` : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(a.titolo)}`, target: '_blank', rel: 'noopener noreferrer' }, riga(a.titolo)), ` (${a.rivista}, ${a.anno})`)))) : null,
+    origine(usoWiki ? L.wiki : (sc && L.fda), studi && L.pubmed)));
 
   // 5. Effetti collaterali
   const effTesto = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.effetti) : '';
@@ -577,7 +600,7 @@ function disegna(d) {
   const frasiAvv = frasiConPercentuale(sc ? sc.avverse : '', 5);
   if (frasiAvv.length) eff.push(crea('details', {}, crea('summary', { text: 'Percentuali dagli studi clinici (scheda FDA, tradotta)' }),
     crea('ul', { class: 'pulito' }, frasiAvv.map(f => crea('li', {}, riga(f))))));
-  eff.push(origine('openFDA (segnalazioni) · Wikipedia' + (wen ? ' (tradotto dall\'inglese)' : '')));
+  eff.push(origine(reaz && L.segn, effTesto && L.wiki, frasiAvv.length && L.fda));
   out.push(scheda('⚠️', 'Effetti collaterali', ...eff));
 
   // 5b. Cosa abbinare per ridurre gli effetti collaterali
@@ -599,7 +622,7 @@ function disegna(d) {
     : 'Non ho trovato abbinamenti documentati per questo prodotto nelle fonti consultate.' }));
   out.push(scheda('🛡️', 'Cosa abbinare per ridurre gli effetti collaterali', ...corpo,
     crea('p', { class: 'nota', text: 'Informazione generale, non una prescrizione. Nessun effetto collaterale si "annulla" con certezza: non aggiungere né sospendere farmaci o integratori senza il parere di medico, farmacista o veterinario, perché anche gli abbinamenti possono interagire. Se compaiono sintomi forti (difficoltà a respirare, gonfiore di viso o gola, sangue nelle feci, ittero), cerca subito assistenza medica.' }),
-    origine('linee guida e revisioni di uso comune · schede ufficiali FDA')));
+    origine(gruppi.length && 'base curata dall\'app per classi di farmaci (non tratta da una singola fonte)', gruppi.length && L.revisioni, (accorg.length || interaz.length) && L.fda)));
 
   // 6. Farmaci simili
   out.push(scheda('🔁', 'Farmaci simili',
@@ -607,7 +630,7 @@ function disegna(d) {
       ? crea('div', {}, crea('p', { class: 'sotto' }, `Stessa classe terapeutica (ATC ${simili.atc}: `, riga(simili.classe.toLowerCase()), '):'),
         crea('div', { class: 'etichette' }, simili.simili.map(s => crea('button', { type: 'button', class: 'etichetta', 'data-q': s, style: 'border:0;font:inherit;cursor:pointer', text: s }))))
       : crea('p', { class: 'vuoto', text: 'Nessun farmaco simile trovato (RxNav copre i medicinali; per erbe e integratori non c\'è una classificazione).' }),
-    origine('RxNav / classificazione ATC')));
+    origine(simili && L.rx, L.atc)));
 
   // Motori di ricerca e fonti
   out.push(scheda('🔎', 'Approfondisci sui motori di ricerca', crea('div', { class: 'motori' }, collegamenti(q))));
@@ -647,7 +670,7 @@ async function cerca(q, animale) {
   }
   const sc = ficha ? estraiScheda(ficha.etichetta) : null;
   if (sc && sc.principi.length) sc.principi = unici((await prova('Wikipedia (nomi italiani)', () => nomiItaliani(sc.principi))) || sc.principi);
-  Object.assign(contesto, { nomi, wiki, sc, reaz, simili, studi });
+  Object.assign(contesto, { nomi, nomeFDA: ficha ? ficha.nome : (reaz ? reaz.nome : nomi[0]), wiki, sc, reaz, simili, studi });
   return contesto;
 }
 
