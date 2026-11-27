@@ -11,7 +11,7 @@ const bottone = document.getElementById('installa-bottone');
 const aiuto = document.getElementById('installa-aiuto');
 const giaApp = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
-if (riquadro && !giaApp) {
+if (riquadro && bottone && aiuto && !giaApp) {
   riquadro.hidden = false;
   // Chrome su Android: il browser offre l'installazione diretta
   window.addEventListener('beforeinstallprompt', e => {
@@ -22,8 +22,7 @@ if (riquadro && !giaApp) {
   });
   bottone.addEventListener('click', async () => {
     if (!richiesta) return;
-    richiesta.prompt();
-    await richiesta.userChoice.catch(() => null);
+    try { await richiesta.prompt(); await richiesta.userChoice; } catch (e) { /* richiesta già usata o annullata */ }
     richiesta = null;
     bottone.hidden = true;
   });
