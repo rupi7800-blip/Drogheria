@@ -530,12 +530,13 @@ function disegna(d) {
   const e = encodeURIComponent;
   const nome = (d.nomeFDA || (nomi && nomi[0]) || q).replace(/"/g, '');
   const inEn = !!wiki && wiki.lang === 'en';
+  const nomeSegn = ((reaz && reaz.nome) || nome).replace(/"/g, '');   // lo stesso nome con cui sono calcolate le percentuali
   const L = {
     wiki: wiki && wiki.url ? { t: inEn ? 'Wikipedia (tradotto dall\'inglese)' : 'Wikipedia (italiano)', u: wiki.url } : null,
     fda: { t: 'FDA – DailyMed, scheda ufficiale (tradotta automaticamente dall\'inglese)', u: `https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=${e(nome)}` },
     segn: { t: animale ? 'openFDA – segnalazioni veterinarie (dati)' : 'openFDA – segnalazioni di reazioni (dati)',
-      u: animale ? `https://api.fda.gov/animalandveterinary/event.json?search=drug.active_ingredients.name:%22${e(nome)}%22&count=reaction.veddra_term_name.exact&limit=20`
-        : `https://api.fda.gov/drug/event.json?search=patient.drug.openfda.generic_name:%22${e(nome)}%22&count=patient.reaction.reactionmeddrapt.exact&limit=20` },
+      u: animale ? `https://api.fda.gov/animalandveterinary/event.json?search=drug.active_ingredients.name:%22${e(nomeSegn)}%22&count=reaction.veddra_term_name.exact&limit=20`
+        : `https://api.fda.gov/drug/event.json?search=patient.drug.openfda.generic_name:%22${e(nomeSegn)}%22&count=patient.reaction.reactionmeddrapt.exact&limit=20` },
     pubmed: { t: 'PubMed (titoli tradotti)', u: `https://pubmed.ncbi.nlm.nih.gov/?term=${e(nome)}` },
     revisioni: { t: 'PubMed – revisioni sugli effetti indesiderati', u: `https://pubmed.ncbi.nlm.nih.gov/?term=${e(nome + ' adverse effects management review')}` },
     rx: { t: 'RxNav (NIH)', u: `https://mor.nlm.nih.gov/RxNav/search?searchBy=String&searchTerm=${e(nome)}` },
