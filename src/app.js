@@ -121,14 +121,30 @@ function wikiURL(lang, params) {
   return `https://${lang}.wikipedia.org/w/api.php?` + new URLSearchParams({ format: 'json', origin: '*', ...params });
 }
 
+const PERSONA = /\b(nata|nato|tennist|calciator|cestist|attrice|attore|cantante|politic[oa]|pilota|ciclista|atleta|nuotator|scrittor|giocator|born)\b|\(\d{4}\)|\b\d{1,2} \w+ \d{4}\b/i;
+
+// Ordina i risultati di Wikipedia: prima il titolo uguale alla ricerca, poi quelli che parlano di farmaci;
+// le pagine di persone (es. atleti citati per un caso di doping) vengono scartate.
+function ordinaCandidati(q, hits) {
+  const nq = normalizza(q);
+  return hits.map(h => {
+    const t = normalizza(h.titolo), testo = h.snippet + ' ' + h.titolo;
+    let punti = 0;
+    if (t === nq) punti += 100;
+    else if (normalizza(senzaParentesi(h.titolo)) === nq) punti += 90;
+    else if (t.includes(nq)) punti += 40;
+    if (PAROLE_FARMACO.test(testo)) punti += 10;
+    if (PERSONA.test(h.snippet) && punti < 40) punti -= 100;
+    return { ...h, punti };
+  }).filter(h => h.punti > -50).sort((a, b) => b.punti - a.punti);
+}
+
 async function cercaWikipedia(q) {
   for (const lang of ['it', 'en']) {
-    const j = await getJSON(wikiURL(lang, { action: 'query', list: 'search', srsearch: q, srlimit: '6', srprop: 'snippet' }));
-    const hits = (j.query && j.query.search) || [];
-    if (!hits.length) continue;
-    const tutti = hits.map(h => ({ titolo: h.title, snippet: (h.snippet || '').replace(/<[^>]+>/g, '') }));
-    const ordinati = [...tutti.filter(h => PAROLE_FARMACO.test(h.snippet + ' ' + h.titolo)), ...tutti.filter(h => !PAROLE_FARMACO.test(h.snippet + ' ' + h.titolo))];
-    return { lang, candidati: ordinati };
+    const j = await getJSON(wikiURL(lang, { action: 'query', list: 'search', srsearch: q, srlimit: '8', srprop: 'snippet' }));
+    const hits = ((j.query && j.query.search) || []).map(h => ({ titolo: h.title, snippet: (h.snippet || '').replace(/<[^>]+>/g, '') }));
+    const ordinati = ordinaCandidati(q, hits);
+    if (ordinati.length && (ordinati[0].punti >= 10 || lang === 'en')) return { lang, candidati: ordinati };
   }
   return null;
 }
@@ -434,5 +450,5 @@ if (typeof document !== 'undefined') {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
+  module.exports = { ordinaCandidati, dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
 }
