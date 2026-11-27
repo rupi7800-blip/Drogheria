@@ -121,7 +121,7 @@ function wikiURL(lang, params) {
   return `https://${lang}.wikipedia.org/w/api.php?` + new URLSearchParams({ format: 'json', origin: '*', ...params });
 }
 
-const PERSONA = /\b(nata|nato|tennist|calciator|cestist|attrice|attore|cantante|politic[oa]|pilota|ciclista|atleta|nuotator|scrittor|giocator|born)\b|\(\d{4}\)|\b\d{1,2} \w+ \d{4}\b/i;
+const PERSONA = /\b(tennist[ae]|calciator[ei]|cestist[ae]|attrice|attore (cinematografico|teatrale|statunitense|italiano)|cantante|pilota|ciclista|atleta|nuotator[ei]|scrittor[ei]|giocator[ei]|nat[oa] (a|il|nel|in) )|\([^)]*\b\d{1,2} \w+ \d{4}[^)]*\)/i;
 
 // Ordina i risultati di Wikipedia: prima il titolo uguale alla ricerca, poi quelli che parlano di farmaci;
 // le pagine di persone (es. atleti citati per un caso di doping) vengono scartate.
@@ -134,19 +134,22 @@ function ordinaCandidati(q, hits) {
     else if (normalizza(senzaParentesi(h.titolo)) === nq) punti += 90;
     else if (t.includes(nq)) punti += 40;
     if (PAROLE_FARMACO.test(testo)) punti += 10;
-    if (PERSONA.test(h.snippet) && punti < 40) punti -= 100;
+    if (PERSONA.test(h.snippet) && punti < 90) punti -= 100;
     return { ...h, punti };
   }).filter(h => h.punti > -50).sort((a, b) => b.punti - a.punti);
 }
 
 async function cercaWikipedia(q) {
+  let riserva = null;
   for (const lang of ['it', 'en']) {
     const j = await getJSON(wikiURL(lang, { action: 'query', list: 'search', srsearch: q, srlimit: '8', srprop: 'snippet' }));
     const hits = ((j.query && j.query.search) || []).map(h => ({ titolo: h.title, snippet: (h.snippet || '').replace(/<[^>]+>/g, '') }));
     const ordinati = ordinaCandidati(q, hits);
-    if (ordinati.length && (ordinati[0].punti >= 10 || lang === 'en')) return { lang, candidati: ordinati };
+    if (ordinati.length && ordinati[0].punti >= 10) return { lang, candidati: ordinati };
+    // nessun segnale chiaro: tengo il primo gruppo di risultati come riserva, senza scartare l'intera ricerca
+    if (!riserva && hits.length) riserva = { lang, candidati: ordinati.length ? ordinati : hits };
   }
-  return null;
+  return riserva;
 }
 
 async function caricaPagina(lang, titolo) {
