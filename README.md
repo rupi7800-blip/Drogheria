@@ -15,7 +15,7 @@ Nessuna installazione: apri `index.html` nel browser, oppure pubblica la cartell
 - Collegamenti diretti a Google, Bing, DuckDuckGo, AIFA, EMA, DailyMed
 
 ## Traduzione
-Tutto è mostrato in italiano. I testi inglesi (schede FDA, Wikipedia inglese, titoli PubMed, reazioni) sono tradotti dal browser nell'ordine: traduttore integrato di Chrome (sul dispositivo) → Google Traduttore (servizio non ufficiale, senza chiave) → MyMemory. Se nessuno risponde, il testo resta in inglese con un avviso. I nomi dei farmaci simili passano dai collegamenti tra lingue di Wikipedia.
+Tutto è mostrato in italiano. I testi inglesi (schede FDA, Wikipedia inglese, titoli PubMed, reazioni) sono tradotti dal browser nell'ordine: traduttore integrato di Chrome (sul dispositivo) → Google Traduttore (servizio non ufficiale, senza chiave) → MyMemory. Se nessuno risponde, il testo resta in inglese con un avviso. **Riservatezza:** al traduttore vengono inviati solo i testi delle fonti, mai il termine digitato; i testi però contengono il nome del farmaco, quindi i servizi esterni possono dedurre l'argomento. Con il traduttore integrato di Chrome nulla lascia il dispositivo. I nomi dei farmaci simili passano dai collegamenti tra lingue di Wikipedia.
 
 ## Limiti onesti
 - Le traduzioni sono automatiche e possono contenere imprecisioni; per la cura fa fede il foglietto illustrativo.

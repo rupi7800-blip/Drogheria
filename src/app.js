@@ -546,7 +546,8 @@ function disegna(d) {
   const dose = doseWiki || (sc && sc.dose);
   out.push(scheda('💊', 'Modo d\'uso', testoBlocco(dose, doseWiki ? wen : true, 650),
     sc && sc.via.length ? crea('p', { class: 'sotto' }, 'Via di somministrazione: ', riga(sc.via.join(', ').toLowerCase())) : null,
-    crea('p', { class: 'nota', text: 'La dose giusta dipende da età, peso e condizioni: segui sempre il foglietto illustrativo e il parere di medico, farmacista o veterinario.' })));
+    crea('p', { class: 'nota', text: 'La dose giusta dipende da età, peso e condizioni: segui sempre il foglietto illustrativo e il parere di medico, farmacista o veterinario. Unità di misura, intervalli e divieti vanno sempre controllati sul foglietto: una traduzione automatica può sbagliare.' }),
+    origine(doseWiki ? (wen ? 'Wikipedia (tradotto automaticamente dall\'inglese)' : 'Wikipedia (italiano)') : 'FDA (tradotto automaticamente dall\'inglese)')));
 
   // 4. A cosa serve + percentuali di efficacia
   const usoWiki = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.uso) : '';
@@ -559,7 +560,8 @@ function disegna(d) {
       : crea('p', { class: 'nota', text: 'Una percentuale di efficacia affidabile non è disponibile come dato aperto: dipende da malattia, dose e popolazione. Qui sotto trovi gli studi principali, dove leggerla con il contesto giusto.' }),
     studi ? crea('div', {}, crea('p', { class: 'sotto', text: `Studi sperimentali e revisioni su PubMed: ${studi.totale.toLocaleString('it-IT')}. I più rilevanti:` }),
       crea('ul', { class: 'pulito' }, studi.articoli.map(a => crea('li', {},
-        crea('a', { href: `https://pubmed.ncbi.nlm.nih.gov/${a.id}/`, target: '_blank', rel: 'noopener noreferrer' }, riga(a.titolo)), ` (${a.rivista}, ${a.anno})`)))) : null));
+        crea('a', { href: `https://pubmed.ncbi.nlm.nih.gov/${a.id}/`, target: '_blank', rel: 'noopener noreferrer' }, riga(a.titolo)), ` (${a.rivista}, ${a.anno})`)))) : null,
+    origine(usoWiki ? (wen ? 'Wikipedia (tradotto automaticamente dall\'inglese)' : 'Wikipedia (italiano)') : 'FDA (tradotto automaticamente dall\'inglese) · PubMed (titoli tradotti)')));
 
   // 5. Effetti collaterali
   const effTesto = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.effetti) : '';
@@ -609,7 +611,7 @@ function disegna(d) {
 
   // Motori di ricerca e fonti
   out.push(scheda('🔎', 'Approfondisci sui motori di ricerca', crea('div', { class: 'motori' }, collegamenti(q))));
-  out.push(crea('p', { class: 'origine', text: 'I testi provenienti da fonti in inglese sono tradotti automaticamente in italiano e possono contenere imprecisioni: per le decisioni sulla cura fa fede il foglietto illustrativo.' }));
+  out.push(crea('p', { class: 'origine', text: 'I testi provenienti da fonti in inglese sono tradotti automaticamente in italiano e possono contenere imprecisioni: per le decisioni sulla cura fa fede il foglietto illustrativo. Se il browser non traduce da sé, questi testi delle fonti (non ciò che hai cercato) vengono inviati a Google Traduttore o a MyMemory; possono però rivelare l\'argomento, perché contengono il nome del farmaco.' }));
   out.push(crea('ul', { class: 'fonti' }, stato.map(s => crea('li', { text: (s.ok ? '✓ ' : '✗ ') + s.nome }))));
   return out;
 }
