@@ -162,16 +162,17 @@ async function cercaWikipedia(q) {
 async function caricaPagina(lang, titolo) {
   const j = await getJSON(wikiURL(lang, {
     action: 'query', titles: titolo, redirects: '1', prop: 'extracts|langlinks|info', explaintext: '1',
-    lllang: 'en', inprop: 'url', exsectionformat: 'wiki',
+    lllang: lang === 'it' ? 'en' : 'it', inprop: 'url', exsectionformat: 'wiki',
   }));
   const pagine = Object.values((j.query && j.query.pages) || {});
   const p = pagine[0];
   if (!p || p.missing !== undefined) return null;
   const testo = p.extract || '';
   const sezioni = dividiSezioni(testo);
+  const altro = (p.langlinks && p.langlinks[0] && (p.langlinks[0]['*'] || p.langlinks[0].title)) || '';
   return {
-    lang, titolo: p.title, url: p.fullurl,
-    titoloEn: lang === 'en' ? p.title : ((p.langlinks && p.langlinks[0] && (p.langlinks[0]['*'] || p.langlinks[0].title)) || ''),
+    lang, titolo: lang === 'en' ? (altro || italianizza(p.title.toLowerCase())) : p.title, url: p.fullurl,
+    titoloEn: lang === 'en' ? p.title : altro,
     intro: sezioni[0].corpo.split('\n\n')[0] || '',
     sezioni,
   };
@@ -221,6 +222,7 @@ async function reazioniFDA(nomi, animale) {
 async function farmaciSimili(nomi) {
   const RX = 'https://rxnav.nlm.nih.gov/REST';
   for (const n of nomi) {
+   try {
     const r = await getJSON(`${RX}/rxcui.json?name=${encodeURIComponent(n)}&search=2`);
     const rxcui = r.idGroup && r.idGroup.rxnormId && r.idGroup.rxnormId[0];
     if (!rxcui) continue;
@@ -233,6 +235,7 @@ async function farmaciSimili(nomi) {
     const membri = ((m.drugMemberGroup && m.drugMemberGroup.drugMember) || []).map(x => x.minConcept.name.toLowerCase());
     const simili = unici(membri).filter(x => !nomi.includes(x) && x !== n.toLowerCase());
     return { classe: classe.className, atc: classe.classId, simili: simili.slice(0, 24) };
+   } catch (e) { if (e.status !== 404) throw e; }
   }
   return null;
 }
@@ -248,7 +251,7 @@ async function studiPubMed(termine) {
   const d = await getJSON(`${E}/esummary.fcgi?db=pubmed&retmode=json&id=${ids.join(',')}`);
   return {
     totale: Number(s.esearchresult.count) || ids.length,
-    articoli: ids.map(id => d.result[id]).filter(Boolean).map(a => ({
+    articoli: ids.map(id => d.result[id]).filter(a => a && a.title).map(a => ({
       id: a.uid, titolo: a.title, rivista: a.source, anno: (a.pubdate || '').slice(0, 4),
     })),
   };
@@ -379,18 +382,18 @@ function spezza(testo, max = 450) {
   return pezzi.flatMap(c => c.length > max ? c.match(new RegExp('.{1,' + max + '}', 'g')) : [c]);
 }
 
+const attesa = (pr, ms) => Promise.race([pr, new Promise((_, no) => setTimeout(() => no(new Error('tempo scaduto')), ms))]);
 let traduttoreLocale = null;
 let localeKO = false;
 async function traduciLocale(pezzo) {            // traduttore del browser (Chrome), sul dispositivo
   if (typeof Translator === 'undefined' || localeKO) throw new Error('assente');
   if (!traduttoreLocale) {
     const o = { sourceLanguage: 'en', targetLanguage: 'it' };
-    const attesa = (pr, ms) => Promise.race([pr, new Promise((_, no) => setTimeout(() => no(new Error('tempo scaduto')), ms))]);
     if ((await attesa(Translator.availability(o), 1500)) !== 'available') throw new Error('non pronto');
     traduttoreLocale = await attesa(Translator.create(o), 3000);
   }
   // (se un passaggio sopra fallisce, l'eccezione esce e il motore viene escluso qui sotto)
-  return traduttoreLocale.translate(pezzo);
+  return attesa(traduttoreLocale.translate(pezzo), 8000);
 }
 async function traduciGoogle(pezzo) {
   const j = await getJSON('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=it&dt=t&q=' + encodeURIComponent(pezzo));
@@ -401,7 +404,7 @@ async function traduciGoogle(pezzo) {
 async function traduciMyMemory(pezzo) {
   const j = await getJSON('https://api.mymemory.translated.net/get?langpair=en|it&q=' + encodeURIComponent(pezzo));
   const t = j.responseData && j.responseData.translatedText;
-  if (!t || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(t) || j.responseStatus !== 200) throw new Error('quota');
+  if (!t || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(t) || Number(j.responseStatus) !== 200) throw new Error('quota');
   return t;
 }
 
@@ -420,16 +423,21 @@ async function traduci(testo) {
   return esito;
 }
 
+// Ripiego per i nomi inglesi senza pagina italiana: desinenze tipiche delle denominazioni comuni
+function italianizza(n) {
+  return n.replace(/ph/g, 'f').replace(/ine$/, 'ina').replace(/ole$/, 'olo').replace(/ol$/, 'olo');
+}
+
 // Nomi inglesi di principi attivi -> nome italiano, tramite i collegamenti tra le lingue di Wikipedia
 async function nomiItaliani(lista) {
   if (!lista.length) return lista;
-  const cap = n => n.charAt(0).toUpperCase() + n.slice(1);
+  const cap = n => { n = n.toLowerCase(); return n.charAt(0).toUpperCase() + n.slice(1); };
   const j = await getJSON(wikiURL('en', { action: 'query', titles: lista.map(cap).join('|'), redirects: '1', prop: 'langlinks', lllang: 'it', lllimit: '500' }));
   const q = j.query || {}, norm = {}, red = {}, it = {};
   (q.normalized || []).forEach(x => { norm[x.from] = x.to; });
   (q.redirects || []).forEach(x => { red[x.from] = x.to; });
   Object.values(q.pages || {}).forEach(pg => { if (pg.langlinks && pg.langlinks[0]) it[pg.title] = pg.langlinks[0]['*'] || pg.langlinks[0].title; });
-  return lista.map(n => { let t = cap(n); t = norm[t] || t; t = red[t] || t; return (it[t] || n).toLowerCase(); });
+  return lista.map(n => { let t = cap(n); t = norm[t] || t; t = red[t] || t; return (it[t] || italianizza(n.toLowerCase())).toLowerCase(); });
 }
 
 /* ---------- Interfaccia ---------- */
@@ -459,6 +467,7 @@ const origine = t => crea('p', { class: 'origine', text: 'Fonte: ' + t });
 
 // Testi inglesi: nascono con un segnaposto e vengono sostituiti dalla traduzione italiana (vedi traduciPagina)
 function riga(testoEn) {
+  if (!testoEn) return crea('span', {});
   const n = crea('span', { class: 'da-tradurre', text: '…' });
   n.dataset.orig = testoEn;
   return n;
@@ -520,8 +529,8 @@ function disegna(d) {
   const nomeTitolo = wiki ? wiki.titolo : q;
   const principi = sc && sc.principi.length ? sc.principi : [];
   out.push(scheda('🧪', 'Principio attivo',
-    crea('p', { class: 'titolo', text: wiki ? wiki.titolo : (principi[0] ? principi[0].toLowerCase().replace(/^./, c => c.toUpperCase()) : nomeTitolo) }),
-    principi.length ? crea('p', { class: 'sotto', text: 'Nome nelle schede USA: ' + principi.join(', ').toLowerCase() }) : null,
+    crea('p', { class: 'titolo', text: wiki ? wiki.titolo : (principi[0] ? principi[0].replace(/^./, c => c.toUpperCase()) : nomeTitolo) }),
+    principi.length ? crea('p', { class: 'sotto', text: (principi.length > 1 ? 'Principi attivi: ' : 'Principio attivo: ') + principi.join(', ') }) : null,
     sc && sc.marchi.length ? crea('div', { class: 'etichette' }, sc.marchi.map(m => crea('span', { class: 'etichetta', text: m }))) : null,
     wiki ? testoBlocco(wiki.intro, wiki.lang === 'en', 420) : crea('p', { class: 'vuoto', text: 'Nessuna descrizione trovata.' }),
     origine([wiki && (wiki.lang === 'en' ? 'Wikipedia (tradotto dall\'inglese)' : 'Wikipedia'), sc && 'FDA (schede USA)'].filter(Boolean).join(' · ') || '—')));
@@ -570,7 +579,7 @@ function disegna(d) {
   out.push(scheda('⚠️', 'Effetti collaterali', ...eff));
 
   // 5b. Cosa abbinare per ridurre gli effetti collaterali
-  const gruppi = animale ? [] : abbinamenti(nomi || [], wiki ? wiki.titolo : '');
+  const gruppi = animale ? [] : abbinamenti(nomi || [], wiki ? wiki.titolo + ' ' + wiki.titoloEn : '');
   const accorg = accorgimentiDaScheda(sc ? sc.accorgimenti : '');
   const interaz = frasiUtili(sc ? sc.interazioni : '', 4);
   const corpo = [];
@@ -618,7 +627,8 @@ async function cerca(q, animale) {
   let wiki = null;
   if (ric && ric.candidati.length) {
     wiki = await prova('Wikipedia (pagina)', () => caricaPagina(ric.lang, ric.candidati[0].titolo));
-    contesto.candidati = ric.candidati.map(c => c.titolo);
+    const titoli = ric.candidati.map(c => c.titolo);
+    contesto.candidati = ric.lang === 'en' ? ((await prova('Wikipedia (nomi italiani)', () => nomiItaliani(titoli))) || titoli) : titoli;
   }
   const nomi = nomiPerFDA(q, wiki ? wiki.titoloEn : '');
 
@@ -633,7 +643,9 @@ async function cerca(q, animale) {
     const it = await prova('Wikipedia (nomi italiani)', () => nomiItaliani(simili.simili));
     if (it) simili.simili = unici(it);
   }
-  Object.assign(contesto, { nomi, wiki, sc: ficha ? estraiScheda(ficha.etichetta) : null, reaz, simili, studi });
+  const sc = ficha ? estraiScheda(ficha.etichetta) : null;
+  if (sc && sc.principi.length) sc.principi = unici((await prova('Wikipedia (nomi italiani)', () => nomiItaliani(sc.principi))) || sc.principi);
+  Object.assign(contesto, { nomi, wiki, sc, reaz, simili, studi });
   return contesto;
 }
 
