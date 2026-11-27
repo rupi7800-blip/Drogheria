@@ -121,16 +121,38 @@ function wikiURL(lang, params) {
   return `https://${lang}.wikipedia.org/w/api.php?` + new URLSearchParams({ format: 'json', origin: '*', ...params });
 }
 
+const PERSONA = /\b(tennist[ae]|calciator[ei]|cestist[ae]|attrice|attore (cinematografico|teatrale|statunitense|italiano)|cantante|pilota|ciclista|atleta|nuotator[ei]|scrittor[ei]|giocator[ei]|nat[oa] (a|il|nel|in) )|\([^)]*\b\d{1,2} \w+ \d{4}[^)]*\)/i;
+
+// Ordina i risultati di Wikipedia: prima il titolo uguale alla ricerca, poi quelli che parlano di farmaci;
+// le pagine di persone (es. atleti citati per un caso di doping) vengono scartate.
+function ordinaCandidati(q, hits) {
+  const nq = normalizza(q);
+  return hits.map(h => {
+    const t = normalizza(h.titolo), testo = h.snippet + ' ' + h.titolo;
+    let punti = 0;
+    if (t === nq) punti += 100;
+    else if (normalizza(senzaParentesi(h.titolo)) === nq) punti += 90;
+    else if (t.includes(nq)) punti += 40;
+    if (PAROLE_FARMACO.test(testo)) punti += 10;
+    if (PERSONA.test(h.snippet) && punti < 90) punti -= 100;
+    return { ...h, punti };
+  }).filter(h => h.punti > -50).sort((a, b) => b.punti - a.punti);
+}
+
 async function cercaWikipedia(q) {
+  let riserva = null, errore = null;
   for (const lang of ['it', 'en']) {
-    const j = await getJSON(wikiURL(lang, { action: 'query', list: 'search', srsearch: q, srlimit: '6', srprop: 'snippet' }));
-    const hits = (j.query && j.query.search) || [];
-    if (!hits.length) continue;
-    const tutti = hits.map(h => ({ titolo: h.title, snippet: (h.snippet || '').replace(/<[^>]+>/g, '') }));
-    const ordinati = [...tutti.filter(h => PAROLE_FARMACO.test(h.snippet + ' ' + h.titolo)), ...tutti.filter(h => !PAROLE_FARMACO.test(h.snippet + ' ' + h.titolo))];
-    return { lang, candidati: ordinati };
+    try {
+      const j = await getJSON(wikiURL(lang, { action: 'query', list: 'search', srsearch: q, srlimit: '8', srprop: 'snippet' }));
+      const hits = ((j.query && j.query.search) || []).map(h => ({ titolo: h.title, snippet: (h.snippet || '').replace(/<[^>]+>/g, '') }));
+      const ordinati = ordinaCandidati(q, hits);   // già senza pagine di persone
+      if (ordinati.length && ordinati[0].punti >= 10) return { lang, candidati: ordinati };
+      // nessun segnale chiaro: tengo come riserva solo risultati già filtrati
+      if (!riserva && ordinati.length) riserva = { lang, candidati: ordinati };
+    } catch (e) { errore = errore || e; }
   }
-  return null;
+  if (!riserva && errore) throw errore;   // nessuna lingua ha risposto: la fonte risulta non raggiungibile
+  return riserva;
 }
 
 async function caricaPagina(lang, titolo) {
@@ -434,5 +456,5 @@ if (typeof document !== 'undefined') {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
+  module.exports = { cercaWikipedia, ordinaCandidati, dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
 }
