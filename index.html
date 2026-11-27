@@ -6,6 +6,12 @@
   <meta name="theme-color" content="#4f7f6b">
   <title>Drogheria – Cerca farmaci e rimedi</title>
   <meta name="description" content="Cerca farmaci, integratori, fitoterapici e prodotti omeopatici per persone e animali: principio attivo, meccanismo, uso, effetti collaterali e alternative.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icone/favicon.png">
+  <link rel="apple-touch-icon" href="icone/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Drogheria">
   <link rel="stylesheet" href="src/style.css">
 </head>
 <body>
@@ -40,10 +46,16 @@
     <section id="risultati" class="risultati" hidden></section>
   </main>
 
+  <aside id="installa" class="installa" hidden>
+    <button id="installa-bottone" type="button" hidden>📲 Installa l'app sul telefono</button>
+    <p id="installa-aiuto">Per averla come app su Android: apri il menu del browser (⋮) e scegli <strong>«Installa app»</strong> oppure <strong>«Aggiungi a schermata Home»</strong>.</p>
+  </aside>
+
   <footer class="piede">
     <p><strong>Solo a scopo informativo.</strong> Non sostituisce il parere del medico, del farmacista o del veterinario. Le percentuali provengono da segnalazioni e studi pubblici e non sono una garanzia di efficacia o di sicurezza per il singolo caso.</p>
   </footer>
 
   <script src="src/app.js"></script>
+  <script src="src/installa.js"></script>
 </body>
 </html>

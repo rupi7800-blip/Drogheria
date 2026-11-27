@@ -686,6 +686,10 @@ if (typeof document !== 'undefined') {
     if (!q) return;
     campoQ.value = q;
     const animale = modulo.chi.value === 'animale';
+    if (navigator.onLine === false) {
+      stato.replaceChildren(crea('p', {}, 'Sei senza connessione: la ricerca ha bisogno della rete. Riprova quando torni online.'));
+      return;
+    }
     const id = ++ultimaRicerca;
     risultati.hidden = true; risultati.replaceChildren();
     stato.replaceChildren(crea('span', { class: 'ruota' }), `Cerco «${q}» nelle fonti…`);
@@ -693,7 +697,10 @@ if (typeof document !== 'undefined') {
     const d = await cerca(q, animale);
     if (id !== ultimaRicerca) return;
     if (!d.wiki && !d.sc && !d.reaz) {
-      stato.replaceChildren(crea('p', {}, `Nessun risultato per «${q}». Controlla l'ortografia o prova con il principio attivo.`),
+      const nessunaFonte = d.stato.length > 0 && d.stato.every(x => !x.ok);
+      stato.replaceChildren(crea('p', {}, nessunaFonte
+        ? 'Non riesco a raggiungere le fonti: controlla la connessione e riprova. Intanto puoi usare i collegamenti qui sotto.'
+        : `Nessun risultato per «${q}». Controlla l'ortografia o prova con il principio attivo.`),
         crea('div', { class: 'motori', style: 'justify-content:center' }, collegamenti(q)));
       return;
     }
