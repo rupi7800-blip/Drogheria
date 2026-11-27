@@ -259,41 +259,51 @@ async function studiPubMed(termine) {
 // Abbinamenti e accorgimenti consolidati, per classe di principio attivo (informazione generale, non prescrizione).
 // evidenza: alta = linee guida / revisioni solide; moderata = studi concordi ma non definitivi; limitata = dati incerti.
 const ABBINAMENTI = [
-  { gruppo: 'Antinfiammatori (FANS)', cerca: /ibuprofen|naproxen|diclofenac|ketoprofen|aspirin|acetylsalicylic|celecoxib|indomethacin|ketorolac|nimesulide|etoricoxib|flurbiprofen/,
+  { gruppo: 'Antinfiammatori (FANS)', cerca: /ibuprofen|naproxen|diclofenac|ketoprofen|aspirin(?!-free)|acetylsalicylic|celecoxib|indomethacin|ketorolac|nimesulide|etoricoxib|flurbiprofen/,
     consigli: [
       ['Prenderli a stomaco pieno, durante o dopo i pasti, con un bicchiere d\'acqua.', 'alta'],
       ['Se l\'uso è prolungato o c\'è rischio per lo stomaco (età avanzata, ulcera, cortisonici, anticoagulanti): il medico può associare un protettore gastrico (inibitore di pompa come omeprazolo o pantoprazolo).', 'alta'],
-      ['Bere a sufficienza: aiuta a proteggere i reni.', 'moderata'],
-      ['Non associarli ad altri antinfiammatori e limitare l\'alcol.', 'alta'],
+      ['Bere a sufficienza aiuta a proteggere i reni. Con disidratazione (vomito, diarrea, febbre alta) o problemi ai reni, chiedere al medico prima di prenderli.', 'moderata'],
+      ['Non associarli ad altri antinfiammatori e limitare l\'alcol. L\'aspirina a basso dosaggio prescritta per il cuore non va sospesa senza il medico, che valuterà come associare altri farmaci.', 'alta'],
     ] },
   { gruppo: 'Paracetamolo', cerca: /acetaminophen|paracetamol/,
     consigli: [
       ['Rispettare la dose massima giornaliera del foglietto: il rischio principale è per il fegato.', 'alta'],
       ['Controllare che altri prodotti (influenzali, antidolorifici) non contengano già paracetamolo.', 'alta'],
       ['Evitare l\'alcol durante la terapia.', 'alta'],
-      ['In caso di sovradosaggio l\'antidoto è la N-acetilcisteina, ma si somministra solo in ospedale: va chiamato subito il pronto soccorso.', 'alta'],
+      ['In caso di sovradosaggio, anche senza sintomi, chiamare subito il 112 o un centro antiveleni: esiste un antidoto (N-acetilcisteina), ma lo somministra solo il personale sanitario.', 'alta'],
     ] },
   { gruppo: 'Antibiotici', cerca: /amoxicillin|clavulan|azithromycin|clarithromycin|ciprofloxacin|levofloxacin|doxycycline|cefuroxime|cefixime|ceftriaxone|cefalexin|cephalexin|metronidazole|penicillin/,
     consigli: [
       ['Alcuni probiotici (come Saccharomyces boulardii e certi lattobacilli) riducono il rischio di diarrea da antibiotici.', 'moderata'],
-      ['Contro la nausea, molti antibiotici (es. amoxicillina con acido clavulanico) si tollerano meglio a inizio pasto.', 'moderata'],
-      ['Doxiciclina: molta acqua, non sdraiarsi subito dopo, e distanza da latticini, calcio, ferro e antiacidi.', 'alta'],
+      ['L\'amoxicillina con acido clavulanico si tollera meglio a inizio pasto, contro la nausea.', 'moderata'],
+      ['Doxiciclina: molta acqua, non sdraiarsi subito dopo, e distanza di circa 2 ore da latticini, calcio, ferro e antiacidi.', 'alta'],
       ['Finire il ciclo come prescritto, anche se si sta meglio.', 'alta'],
+    ] },
+  { gruppo: 'Metronidazolo', cerca: /metronidazole|tinidazole/,
+    consigli: [
+      ['Evitare l\'alcol durante la cura e per circa 48 ore dopo, come indicato nei foglietti: può causare nausea, vomito e malessere forte.', 'moderata'],
+    ] },
+  { gruppo: 'Fluorochinoloni (ciprofloxacina, levofloxacina)', cerca: /ciprofloxacin|levofloxacin|moxifloxacin|ofloxacin/,
+    consigli: [
+      ['Tenere alcune ore di distanza da calcio, ferro, magnesio, zinco e antiacidi: ne riducono l\'assorbimento.', 'alta'],
+      ['Dolore o gonfiore a un tendine (soprattutto tallone): smettere di forzare e avvisare subito il medico. Il rischio è maggiore sopra i 60 anni e con i cortisonici.', 'alta'],
     ] },
   { gruppo: 'Metformina', cerca: /metformin/,
     consigli: [
       ['Prenderla durante i pasti e partire da dosi basse aumentando gradualmente: riduce i disturbi di stomaco e intestino.', 'alta'],
       ['Con l\'uso lungo, far controllare periodicamente la vitamina B12.', 'alta'],
     ] },
-  { gruppo: 'Statine', cerca: /statin\b|simvastatin|atorvastatin|rosuvastatin|pravastatin/,
+  { gruppo: 'Statine', cerca: /(?<![a-z])statin(e|s)?\b|simvastatin|atorvastatin|rosuvastatin|pravastatin/,
     consigli: [
       ['Dolori muscolari insoliti vanno riferiti al medico, che può cambiare dose o molecola.', 'alta'],
-      ['Evitare il succo di pompelmo con simvastatina e atorvastatina.', 'alta'],
+      ['Succo di pompelmo: evitarlo con la simvastatina e limitarlo con l\'atorvastatina.', 'alta'],
+      ['Con claritromicina, eritromicina o alcuni antimicotici (itraconazolo, ketoconazolo) l\'interazione è importante: chiedere al medico se sospendere temporaneamente la statina.', 'alta'],
       ['Il coenzima Q10 è spesso proposto per i dolori muscolari, ma i dati sono contrastanti.', 'limitata'],
     ] },
   { gruppo: 'Inibitori dell\'aromatasi', cerca: /letrozole|anastrozole|exemestane/,
     consigli: [
-      ['Calcio e vitamina D, secondo le analisi, e controllo periodico della densità ossea (MOC): la terapia può assottigliare le ossa.', 'alta'],
+      ['Calcio e vitamina D secondo i livelli nel sangue o le indicazioni del medico, e controllo periodico della densità ossea (mineralometria, MOC): la terapia può assottigliare le ossa.', 'alta'],
       ['Attività fisica regolare con carico (camminata, esercizi con pesi leggeri) per ossa, muscoli e dolori articolari.', 'alta'],
     ] },
   { gruppo: 'Cortisonici', cerca: /prednisone|prednisolone|betamethasone|dexamethasone|hydrocortisone|methylprednisolone|deflazacort/,
@@ -303,7 +313,7 @@ const ABBINAMENTI = [
       ['Con i FANS aumenta il rischio allo stomaco: chiedere al medico se serve un protettore gastrico.', 'alta'],
       ['Non sospenderli di colpo dopo un uso prolungato: va ridotta la dose gradualmente.', 'alta'],
     ] },
-  { gruppo: 'Benzodiazepine', cerca: /alprazolam|lorazepam|diazepam|bromazepam|clonazepam|zolpidem/,
+  { gruppo: 'Sedativi e sonniferi (benzodiazepine e simili)', cerca: /alprazolam|lorazepam|diazepam|bromazepam|clonazepam|zolpidem/,
     consigli: [
       ['Evitare alcol e altri sedativi: si potenziano a vicenda.', 'alta'],
       ['Usarle per il tempo più breve possibile e non sospenderle di colpo.', 'alta'],
@@ -311,7 +321,7 @@ const ABBINAMENTI = [
     ] },
   { gruppo: 'Melatonina', cerca: /melatonin/,
     consigli: [
-      ['Dosi basse, 30–60 minuti prima di coricarsi: riducono sonnolenza al mattino e mal di testa.', 'moderata'],
+      ['Dosi basse, 30–60 minuti prima di coricarsi, possono ridurre sonnolenza al mattino e mal di testa.', 'moderata'],
     ] },
 ];
 
@@ -394,7 +404,7 @@ function collegamenti(q) {
 }
 
 function disegna(d) {
-  const { q, animale, wiki, sc, reaz, simili, studi, stato, candidati } = d;
+  const { q, animale, wiki, sc, reaz, simili, studi, stato, candidati, nomi } = d;
   const out = [];
 
   if (candidati && candidati.length > 1) {
@@ -453,7 +463,7 @@ function disegna(d) {
   out.push(scheda('⚠️', 'Effetti collaterali', ...eff));
 
   // 5b. Cosa abbinare per ridurre gli effetti collaterali
-  const gruppi = animale ? [] : abbinamenti(d.nomi || [], wiki ? wiki.titolo : '');
+  const gruppi = animale ? [] : abbinamenti(nomi || [], wiki ? wiki.titolo : '');
   const accorg = accorgimentiDaScheda(sc ? sc.accorgimenti : '');
   const interaz = frasiUtili(sc ? sc.interazioni : '', 4);
   const corpo = [];
