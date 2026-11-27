@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#4f7f6b">
+  <title>Drogheria – Cerca farmaci e rimedi</title>
+  <meta name="description" content="Cerca farmaci, integratori, fitoterapici e prodotti omeopatici per persone e animali: principio attivo, meccanismo, uso, effetti collaterali e alternative.">
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <header class="testata">
+    <div class="marchio" aria-hidden="true">⚕︎</div>
+    <h1>Drogheria</h1>
+    <p>Farmaci, integratori, erbe e rimedi — per persone e animali</p>
+  </header>
+
+  <main>
+    <form id="modulo" class="cerca" role="search" autocomplete="off">
+      <label for="q" class="vis-nascosto">Cerca il farmaco</label>
+      <div class="campo">
+        <input id="q" name="q" type="search" placeholder="Cerca il farmaco (nome, principio attivo, nome comune)…" enterkeyhint="search" autofocus>
+        <button type="submit">Cerca</button>
+      </div>
+      <div class="opzioni" role="radiogroup" aria-label="Destinatario">
+        <label><input type="radio" name="chi" value="umano" checked><span>🧑 Persone</span></label>
+        <label><input type="radio" name="chi" value="animale"><span>🐾 Animali</span></label>
+      </div>
+      <div class="esempi" aria-label="Esempi">
+        <span>Prova con:</span>
+        <button type="button" data-q="Tachipirina">Tachipirina</button>
+        <button type="button" data-q="ibuprofene">ibuprofene</button>
+        <button type="button" data-q="melatonina">melatonina</button>
+        <button type="button" data-q="arnica">arnica</button>
+        <button type="button" data-q="curcuma">curcuma</button>
+      </div>
+    </form>
+
+    <section id="stato" class="stato" aria-live="polite"></section>
+    <section id="risultati" class="risultati" hidden></section>
+  </main>
+
+  <footer class="piede">
+    <p><strong>Solo a scopo informativo.</strong> Non sostituisce il parere del medico, del farmacista o del veterinario. Le percentuali provengono da segnalazioni e studi pubblici e non sono una garanzia di efficacia o di sicurezza per il singolo caso.</p>
+  </footer>
+
+  <script src="src/app.js"></script>
+</body>
+</html>
