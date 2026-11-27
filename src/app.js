@@ -528,7 +528,7 @@ function disegna(d) {
 
   // Collegamenti alle fonti realmente usate
   const e = encodeURIComponent;
-  const nome = d.nomeFDA || (nomi && nomi[0]) || q;
+  const nome = (d.nomeFDA || (nomi && nomi[0]) || q).replace(/"/g, '');
   const inEn = !!wiki && wiki.lang === 'en';
   const L = {
     wiki: wiki && wiki.url ? { t: inEn ? 'Wikipedia (tradotto dall\'inglese)' : 'Wikipedia (italiano)', u: wiki.url } : null,
@@ -539,7 +539,7 @@ function disegna(d) {
     pubmed: { t: 'PubMed (titoli tradotti)', u: `https://pubmed.ncbi.nlm.nih.gov/?term=${e(nome)}` },
     revisioni: { t: 'PubMed – revisioni sugli effetti indesiderati', u: `https://pubmed.ncbi.nlm.nih.gov/?term=${e(nome + ' adverse effects management review')}` },
     rx: { t: 'RxNav (NIH)', u: `https://mor.nlm.nih.gov/RxNav/search?searchBy=String&searchTerm=${e(nome)}` },
-    atc: simili ? { t: 'Classificazione ATC (OMS)', u: `https://atcddd.fhi.no/atc_ddd_index/?code=${e(simili.atc)}` } : null,
+    atc: simili && simili.atc ? { t: 'Classificazione ATC (OMS)', u: `https://atcddd.fhi.no/atc_ddd_index/?code=${e(simili.atc)}` } : null,
   };
 
   if (candidati && candidati.length > 1) {
@@ -582,7 +582,7 @@ function disegna(d) {
       : crea('p', { class: 'nota', text: 'Una percentuale di efficacia affidabile non è disponibile come dato aperto: dipende da malattia, dose e popolazione. Qui sotto trovi gli studi principali, dove leggerla con il contesto giusto.' }),
     studi ? crea('div', {}, crea('p', { class: 'sotto', text: `Studi sperimentali e revisioni su PubMed: ${studi.totale.toLocaleString('it-IT')}. I più rilevanti:` }),
       crea('ul', { class: 'pulito' }, studi.articoli.map(a => crea('li', {},
-        crea('a', { href: `https://pubmed.ncbi.nlm.nih.gov/${a.id}/`, target: '_blank', rel: 'noopener noreferrer' }, riga(a.titolo)), ` (${a.rivista}, ${a.anno})`)))) : null,
+        crea('a', { href: /^\d+$/.test(a.id) ? `https://pubmed.ncbi.nlm.nih.gov/${a.id}/` : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(a.titolo)}`, target: '_blank', rel: 'noopener noreferrer' }, riga(a.titolo)), ` (${a.rivista}, ${a.anno})`)))) : null,
     origine(usoWiki ? L.wiki : (sc && L.fda), studi && L.pubmed)));
 
   // 5. Effetti collaterali
