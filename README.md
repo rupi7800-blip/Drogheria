@@ -14,7 +14,11 @@ Nessuna installazione: apri `index.html` nel browser, oppure pubblica la cartell
 - PubMed: studi e revisioni principali
 - Collegamenti diretti a Google, Bing, DuckDuckGo, AIFA, EMA, DailyMed
 
+## Traduzione
+Tutto è mostrato in italiano. I testi inglesi (schede FDA, Wikipedia inglese, titoli PubMed, reazioni) sono tradotti dal browser nell'ordine: traduttore integrato di Chrome (sul dispositivo) → Google Traduttore (servizio non ufficiale, senza chiave) → MyMemory. Se nessuno risponde, il testo resta in inglese con un avviso. I nomi dei farmaci simili passano dai collegamenti tra lingue di Wikipedia.
+
 ## Limiti onesti
+- Le traduzioni sono automatiche e possono contenere imprecisioni; per la cura fa fede il foglietto illustrativo.
 - Google e Bing non offrono API aperte dal browser: si usano collegamenti diretti.
 - Le percentuali di effetti collaterali sono *percentuali di segnalazione* (FDA), non incidenza reale.
 - La percentuale di efficacia appare solo se citata negli studi clinici della scheda.

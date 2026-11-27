@@ -56,10 +56,10 @@ const RUMORE = ['drug ineffective', 'off label use', 'product use in unapproved 
 const PAROLE_FARMACO = /farmac|principio attivo|integratore|pianta|erba|medicinale|omeopat|veterinari|composto|vitamina|sostanza|analgesic|antinfiammator|antibiotic|ormone|alcaloide|fitoter|rimedio|supplement/i;
 
 const SEZIONI_WIKI = {
-  meccanismo: /meccanism|farmacodinam|azione|modalit.. d'azione|farmacologia/i,
-  uso: /indicazion|usi|impiego|uso terapeutico|utilizz|applicazion|terapia/i,
-  dose: /posologia|dosagg|somministrazion|modalit.. d'uso|dosi/i,
-  effetti: /effetti (collaterali|indesiderati|avversi)|reazioni avverse|tossicit|controindicazion|avvertenz|effetti sulla salute/i,
+  meccanismo: /meccanism|farmacodinam|azione|modalit.. d'azione|farmacologia|mechanism|pharmacodynamics|pharmacology/i,
+  uso: /indicazion|usi|impiego|uso terapeutico|utilizz|applicazion|terapia|medical uses|^uses|indications|therapeutic use/i,
+  dose: /posologia|dosagg|somministrazion|modalit.. d'uso|dosi|dosage|administration|dosing/i,
+  effetti: /effetti (collaterali|indesiderati|avversi)|reazioni avverse|tossicit|controindicazion|avvertenz|effetti sulla salute|side effects|adverse effects|adverse reactions|contraindications|toxicity/i,
 };
 
 /* ---------- Utilità ---------- */
@@ -358,6 +358,80 @@ function estraiScheda(e) {
   };
 }
 
+/* ---------- Traduzione in italiano (tutto ciò che arriva in inglese) ---------- */
+
+const MEMORIA_TR = new Map();
+let attiviTR = 0; const codaTR = [];
+async function limitaTR(fn) {
+  if (attiviTR >= 4) await new Promise(ok => codaTR.push(ok));
+  attiviTR++;
+  try { return await fn(); } finally { attiviTR--; const n = codaTR.shift(); if (n) n(); }
+}
+
+// Spezza il testo in pezzi brevi, a fine frase quando possibile
+function spezza(testo, max = 450) {
+  const frasi = (testo || '').replace(/\s+/g, ' ').trim().split(/(?<=[.;:])\s+/);
+  const pezzi = []; let cur = '';
+  for (const f of frasi) {
+    if (cur && (cur + ' ' + f).length > max) { pezzi.push(cur); cur = f; } else cur = cur ? cur + ' ' + f : f;
+  }
+  if (cur) pezzi.push(cur);
+  return pezzi.flatMap(c => c.length > max ? c.match(new RegExp('.{1,' + max + '}', 'g')) : [c]);
+}
+
+let traduttoreLocale = null;
+let localeKO = false;
+async function traduciLocale(pezzo) {            // traduttore del browser (Chrome), sul dispositivo
+  if (typeof Translator === 'undefined' || localeKO) throw new Error('assente');
+  if (!traduttoreLocale) {
+    const o = { sourceLanguage: 'en', targetLanguage: 'it' };
+    const attesa = (pr, ms) => Promise.race([pr, new Promise((_, no) => setTimeout(() => no(new Error('tempo scaduto')), ms))]);
+    if ((await attesa(Translator.availability(o), 1500)) !== 'available') throw new Error('non pronto');
+    traduttoreLocale = await attesa(Translator.create(o), 3000);
+  }
+  // (se un passaggio sopra fallisce, l'eccezione esce e il motore viene escluso qui sotto)
+  return traduttoreLocale.translate(pezzo);
+}
+async function traduciGoogle(pezzo) {
+  const j = await getJSON('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=it&dt=t&q=' + encodeURIComponent(pezzo));
+  const t = (j[0] || []).map(x => x[0]).join('');
+  if (!t) throw new Error('vuoto');
+  return t;
+}
+async function traduciMyMemory(pezzo) {
+  const j = await getJSON('https://api.mymemory.translated.net/get?langpair=en|it&q=' + encodeURIComponent(pezzo));
+  const t = j.responseData && j.responseData.translatedText;
+  if (!t || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(t) || j.responseStatus !== 200) throw new Error('quota');
+  return t;
+}
+
+// Traduce dall'inglese all'italiano; prova i motori in ordine e ricorda i risultati
+async function traduci(testo) {
+  testo = (testo || '').replace(/\s+/g, ' ').trim();
+  if (!testo) return '';
+  if (MEMORIA_TR.has(testo)) return MEMORIA_TR.get(testo);
+  const pezzi = spezza(testo);
+  let esito = null;
+  for (const motore of [traduciLocale, traduciGoogle, traduciMyMemory]) {
+    try { esito = (await Promise.all(pezzi.map(x => limitaTR(() => motore(x))))).join(' '); break; } catch (e) { if (motore === traduciLocale) localeKO = true; /* provo il prossimo */ }
+  }
+  if (!esito) throw new Error('traduzione non disponibile');
+  MEMORIA_TR.set(testo, esito);
+  return esito;
+}
+
+// Nomi inglesi di principi attivi -> nome italiano, tramite i collegamenti tra le lingue di Wikipedia
+async function nomiItaliani(lista) {
+  if (!lista.length) return lista;
+  const cap = n => n.charAt(0).toUpperCase() + n.slice(1);
+  const j = await getJSON(wikiURL('en', { action: 'query', titles: lista.map(cap).join('|'), redirects: '1', prop: 'langlinks', lllang: 'it', lllimit: '500' }));
+  const q = j.query || {}, norm = {}, red = {}, it = {};
+  (q.normalized || []).forEach(x => { norm[x.from] = x.to; });
+  (q.redirects || []).forEach(x => { red[x.from] = x.to; });
+  Object.values(q.pages || {}).forEach(pg => { if (pg.langlinks && pg.langlinks[0]) it[pg.title] = pg.langlinks[0]['*'] || pg.langlinks[0].title; });
+  return lista.map(n => { let t = cap(n); t = norm[t] || t; t = red[t] || t; return (it[t] || n).toLowerCase(); });
+}
+
 /* ---------- Interfaccia ---------- */
 
 function crea(tag, attrs, ...figli) {
@@ -383,9 +457,39 @@ function scheda(icona, titolo, ...contenuto) {
 
 const origine = t => crea('p', { class: 'origine', text: 'Fonte: ' + t });
 
+// Testi inglesi: nascono con un segnaposto e vengono sostituiti dalla traduzione italiana (vedi traduciPagina)
+function riga(testoEn) {
+  const n = crea('span', { class: 'da-tradurre', text: '…' });
+  n.dataset.orig = testoEn;
+  return n;
+}
+function bloccoEn(testoEn, max = 650) {
+  if (!testoEn) return blocco('', max);
+  const d = crea('div', { class: 'da-tradurre-blocco' }, crea('p', { class: 'vuoto', text: 'Traduzione in corso…' }));
+  d.dataset.orig = testoEn.length > 2400 ? testoEn.slice(0, testoEn.lastIndexOf(' ', 2400)) + '…' : testoEn;
+  d.dataset.max = String(max);
+  return d;
+}
+const testoBlocco = (testo, inglese, max) => inglese ? bloccoEn(testo, max) : blocco(testo, max);
+
+async function traduciPagina(radice) {
+  await Promise.all([...radice.querySelectorAll('.da-tradurre, .da-tradurre-blocco')].map(async n => {
+    const blocchi = n.classList.contains('da-tradurre-blocco');
+    try {
+      const t = await traduci(n.dataset.orig);
+      if (blocchi) { n.replaceChildren(blocco(t, Number(n.dataset.max))); n.classList.remove('da-tradurre-blocco'); }
+      else { n.textContent = t; n.classList.remove('da-tradurre'); }
+    } catch (e) {
+      const nota = 'traduttore non raggiungibile: testo originale in inglese';
+      if (blocchi) { n.replaceChildren(blocco(n.dataset.orig, Number(n.dataset.max)), crea('p', { class: 'nota', text: 'Attenzione, ' + nota + '.' })); n.classList.remove('da-tradurre-blocco'); }
+      else n.textContent = n.dataset.orig + ' (' + nota + ')';
+    }
+  }));
+}
+
 function barre(voci, classe = '') {
   return crea('div', { class: 'barre' }, voci.map(v => crea('div', { class: 'barra ' + classe },
-    crea('div', { class: 'riga' }, crea('span', { text: v.etichetta }), crea('b', { text: pct(v.percentuale) })),
+    crea('div', { class: 'riga' }, crea('span', {}, v.etichetta), crea('b', { text: pct(v.percentuale) })),
     crea('div', { class: 'pista' }, crea('div', { class: 'pieno', style: `width:${Math.min(100, Math.max(2, v.percentuale))}%` })))));
 }
 
@@ -419,47 +523,50 @@ function disegna(d) {
     crea('p', { class: 'titolo', text: wiki ? wiki.titolo : (principi[0] ? principi[0].toLowerCase().replace(/^./, c => c.toUpperCase()) : nomeTitolo) }),
     principi.length ? crea('p', { class: 'sotto', text: 'Nome nelle schede USA: ' + principi.join(', ').toLowerCase() }) : null,
     sc && sc.marchi.length ? crea('div', { class: 'etichette' }, sc.marchi.map(m => crea('span', { class: 'etichetta', text: m }))) : null,
-    wiki ? blocco(wiki.intro, 420) : crea('p', { class: 'vuoto', text: 'Nessuna descrizione trovata.' }),
-    origine([wiki && 'Wikipedia', sc && 'FDA (schede USA)'].filter(Boolean).join(' · ') || '—')));
+    wiki ? testoBlocco(wiki.intro, wiki.lang === 'en', 420) : crea('p', { class: 'vuoto', text: 'Nessuna descrizione trovata.' }),
+    origine([wiki && (wiki.lang === 'en' ? 'Wikipedia (tradotto dall\'inglese)' : 'Wikipedia'), sc && 'FDA (schede USA)'].filter(Boolean).join(' · ') || '—')));
 
   // 2. Meccanismo d'azione
+  const wen = !!wiki && wiki.lang === 'en';
   const mecc = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.meccanismo) : '';
-  out.push(scheda('⚙️', 'Meccanismo d\'azione', blocco(mecc || (sc && sc.meccanismo)),
-    origine(mecc ? 'Wikipedia (italiano)' : 'FDA – testo originale in inglese')));
+  out.push(scheda('⚙️', 'Meccanismo d\'azione', testoBlocco(mecc || (sc && sc.meccanismo), mecc ? wen : true, 650),
+    origine(mecc ? (wen ? 'Wikipedia (tradotto dall\'inglese)' : 'Wikipedia (italiano)') : 'FDA (tradotto automaticamente dall\'inglese)')));
 
   // 3. Modo d'uso
-  const dose = (wiki && trovaSezione(wiki.sezioni, SEZIONI_WIKI.dose)) || (sc && sc.dose);
-  out.push(scheda('💊', 'Modo d\'uso', blocco(dose),
-    sc && sc.via.length ? crea('p', { class: 'sotto', text: 'Via di somministrazione: ' + sc.via.join(', ').toLowerCase() }) : null,
+  const doseWiki = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.dose) : '';
+  const dose = doseWiki || (sc && sc.dose);
+  out.push(scheda('💊', 'Modo d\'uso', testoBlocco(dose, doseWiki ? wen : true, 650),
+    sc && sc.via.length ? crea('p', { class: 'sotto' }, 'Via di somministrazione: ', riga(sc.via.join(', ').toLowerCase())) : null,
     crea('p', { class: 'nota', text: 'La dose giusta dipende da età, peso e condizioni: segui sempre il foglietto illustrativo e il parere di medico, farmacista o veterinario.' })));
 
   // 4. A cosa serve + percentuali di efficacia
-  const uso = (wiki && trovaSezione(wiki.sezioni, SEZIONI_WIKI.uso)) || (sc && sc.indicazioni);
+  const usoWiki = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.uso) : '';
+  const uso = usoWiki || (sc && sc.indicazioni);
   const frasiEff = frasiConPercentuale(sc ? sc.studi : '');
-  out.push(scheda('🎯', 'A cosa serve e percentuali di efficacia', blocco(uso),
+  out.push(scheda('🎯', 'A cosa serve e percentuali di efficacia', testoBlocco(uso, usoWiki ? wen : true, 650),
     frasiEff.length
-      ? crea('div', {}, crea('p', { class: 'sotto', text: 'Dati dagli studi clinici riportati nella scheda ufficiale (inglese):' }),
-        crea('ul', { class: 'pulito' }, frasiEff.map(f => crea('li', { text: f }))))
+      ? crea('div', {}, crea('p', { class: 'sotto', text: 'Dati dagli studi clinici riportati nella scheda ufficiale (tradotti automaticamente dall\'inglese):' }),
+        crea('ul', { class: 'pulito' }, frasiEff.map(f => crea('li', {}, riga(f)))))
       : crea('p', { class: 'nota', text: 'Una percentuale di efficacia affidabile non è disponibile come dato aperto: dipende da malattia, dose e popolazione. Qui sotto trovi gli studi principali, dove leggerla con il contesto giusto.' }),
     studi ? crea('div', {}, crea('p', { class: 'sotto', text: `Studi sperimentali e revisioni su PubMed: ${studi.totale.toLocaleString('it-IT')}. I più rilevanti:` }),
       crea('ul', { class: 'pulito' }, studi.articoli.map(a => crea('li', {},
-        crea('a', { href: `https://pubmed.ncbi.nlm.nih.gov/${a.id}/`, target: '_blank', rel: 'noopener noreferrer', text: a.titolo }), ` (${a.rivista}, ${a.anno})`)))) : null));
+        crea('a', { href: `https://pubmed.ncbi.nlm.nih.gov/${a.id}/`, target: '_blank', rel: 'noopener noreferrer' }, riga(a.titolo)), ` (${a.rivista}, ${a.anno})`)))) : null));
 
   // 5. Effetti collaterali
   const effTesto = wiki ? trovaSezione(wiki.sezioni, SEZIONI_WIKI.effetti) : '';
-  const eff = [blocco(effTesto, 500)];
+  const eff = [testoBlocco(effTesto, wen, 500)];
   if (reaz && reaz.voci.length) {
     eff.push(crea('p', { class: 'sotto', text: `Reazioni più segnalate, in % sul totale di ${reaz.totale.toLocaleString('it-IT')} segnalazioni ${animale ? 'veterinarie' : ''} all'FDA:` }));
-    eff.push(barre(reaz.voci.map(v => ({ etichetta: REAZIONI[normalizza(v.termine)] || v.termine, percentuale: v.percentuale }))));
+    eff.push(barre(reaz.voci.map(v => ({ etichetta: REAZIONI[normalizza(v.termine)] || riga(v.termine.toLowerCase()), percentuale: v.percentuale }))));
     eff.push(crea('p', { class: 'nota', text: 'Attenzione: sono percentuali di segnalazione, non la probabilità reale di avere il disturbo. Chi riferisce un problema è più spesso chi lo ha avuto.' }));
-    if (animale && reaz.specie.length) eff.push(crea('p', { class: 'sotto', text: 'Specie più coinvolte: ' + reaz.specie.map(s => s.term.toLowerCase()).join(', ') }));
+    if (animale && reaz.specie.length) eff.push(crea('p', { class: 'sotto' }, 'Specie più coinvolte: ', riga(reaz.specie.map(s => s.term.toLowerCase()).join(', '))));
   } else {
     eff.push(crea('p', { class: 'vuoto', text: 'Nessuna statistica di segnalazione trovata per questo prodotto.' }));
   }
   const frasiAvv = frasiConPercentuale(sc ? sc.avverse : '', 5);
-  if (frasiAvv.length) eff.push(crea('details', {}, crea('summary', { text: 'Percentuali dagli studi clinici (scheda FDA, inglese)' }),
-    crea('ul', { class: 'pulito' }, frasiAvv.map(f => crea('li', { text: f })))));
-  eff.push(origine('openFDA (segnalazioni) · Wikipedia'));
+  if (frasiAvv.length) eff.push(crea('details', {}, crea('summary', { text: 'Percentuali dagli studi clinici (scheda FDA, tradotta)' }),
+    crea('ul', { class: 'pulito' }, frasiAvv.map(f => crea('li', {}, riga(f))))));
+  eff.push(origine('openFDA (segnalazioni) · Wikipedia' + (wen ? ' (tradotto dall\'inglese)' : '')));
   out.push(scheda('⚠️', 'Effetti collaterali', ...eff));
 
   // 5b. Cosa abbinare per ridurre gli effetti collaterali
@@ -472,10 +579,10 @@ function disegna(d) {
     corpo.push(crea('p', { class: 'sotto', text: g.gruppo + ':' }),
       crea('ul', { class: 'pulito' }, g.consigli.map(c => crea('li', {}, c.testo + ' ', crea('span', { class: 'evid ' + c.evidenza, text: '(' + livello[c.evidenza] + ')' })))));
   }
-  if (accorg.length) corpo.push(crea('details', {}, crea('summary', { text: 'Accorgimenti dalla scheda ufficiale (FDA, inglese)' }),
-    crea('ul', { class: 'pulito' }, accorg.map(f => crea('li', { text: f })))));
-  if (interaz.length) corpo.push(crea('details', {}, crea('summary', { text: 'Da evitare o usare con cautela insieme (FDA, inglese)' }),
-    crea('ul', { class: 'pulito' }, interaz.map(f => crea('li', { text: f })))));
+  if (accorg.length) corpo.push(crea('details', {}, crea('summary', { text: 'Accorgimenti dalla scheda ufficiale (FDA, tradotti)' }),
+    crea('ul', { class: 'pulito' }, accorg.map(f => crea('li', {}, riga(f))))));
+  if (interaz.length) corpo.push(crea('details', {}, crea('summary', { text: 'Da evitare o usare con cautela insieme (FDA, tradotto)' }),
+    crea('ul', { class: 'pulito' }, interaz.map(f => crea('li', {}, riga(f))))));
   if (!corpo.length) corpo.push(crea('p', { class: 'vuoto', text: animale
     ? 'Per gli animali non propongo abbinamenti: dosi e prodotti per le persone possono essere pericolosi per cani, gatti e altre specie.'
     : 'Non ho trovato abbinamenti documentati per questo prodotto nelle fonti consultate.' }));
@@ -486,13 +593,14 @@ function disegna(d) {
   // 6. Farmaci simili
   out.push(scheda('🔁', 'Farmaci simili',
     simili && simili.simili.length
-      ? crea('div', {}, crea('p', { class: 'sotto', text: `Stessa classe terapeutica (ATC ${simili.atc}: ${simili.classe.toLowerCase()}):` }),
+      ? crea('div', {}, crea('p', { class: 'sotto' }, `Stessa classe terapeutica (ATC ${simili.atc}: `, riga(simili.classe.toLowerCase()), '):'),
         crea('div', { class: 'etichette' }, simili.simili.map(s => crea('button', { type: 'button', class: 'etichetta', 'data-q': s, style: 'border:0;font:inherit;cursor:pointer', text: s }))))
       : crea('p', { class: 'vuoto', text: 'Nessun farmaco simile trovato (RxNav copre i medicinali; per erbe e integratori non c\'è una classificazione).' }),
     origine('RxNav / classificazione ATC')));
 
   // Motori di ricerca e fonti
   out.push(scheda('🔎', 'Approfondisci sui motori di ricerca', crea('div', { class: 'motori' }, collegamenti(q))));
+  out.push(crea('p', { class: 'origine', text: 'I testi provenienti da fonti in inglese sono tradotti automaticamente in italiano e possono contenere imprecisioni: per le decisioni sulla cura fa fede il foglietto illustrativo.' }));
   out.push(crea('ul', { class: 'fonti' }, stato.map(s => crea('li', { text: (s.ok ? '✓ ' : '✗ ') + s.nome }))));
   return out;
 }
@@ -521,6 +629,10 @@ async function cerca(q, animale) {
   ]);
   const studi = await prova('PubMed', () => studiPubMed(nomi[0] || q));
 
+  if (simili && simili.simili.length) {
+    const it = await prova('Wikipedia (nomi italiani)', () => nomiItaliani(simili.simili));
+    if (it) simili.simili = unici(it);
+  }
   Object.assign(contesto, { nomi, wiki, sc: ficha ? estraiScheda(ficha.etichetta) : null, reaz, simili, studi });
   return contesto;
 }
@@ -551,6 +663,7 @@ if (typeof document !== 'undefined') {
     stato.replaceChildren();
     risultati.replaceChildren(...disegna(d));
     risultati.hidden = false;
+    traduciPagina(risultati);
     risultati.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -567,5 +680,5 @@ if (typeof document !== 'undefined') {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { abbinamenti, accorgimentiDaScheda, cercaWikipedia, ordinaCandidati, dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
+  module.exports = { traduci, nomiItaliani, spezza, abbinamenti, accorgimentiDaScheda, cercaWikipedia, ordinaCandidati, dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
 }

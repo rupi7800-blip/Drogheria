@@ -3,6 +3,7 @@
 - Quando l'utente dice "Ricorda le /regole" e le regole non si trovano (nessun file `/regole`, nessuna istruzione che le contenga):
   **fermarsi e chiedere dove sono, senza proseguire il lavoro.**
 - Conversare sempre in italiano; usare parole italiane al posto di prestiti da lingue straniere, dove possibile.
+- L'app mostra **sempre tutto in italiano**: ogni testo che arriva da fonti straniere (schede FDA, Wikipedia inglese, PubMed, nomi di reazioni e farmaci) va tradotto automaticamente, mai lasciato in inglese.
 - Il nome del repository voluto è "Drogheria" (attuale: FarmaRadar, da rinominare da GitHub).
 
 ## Regole di consumo e ruoli

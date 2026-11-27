@@ -65,3 +65,4 @@ a{color:var(--verde-scuro)}
 .evid{font-size:.78rem;color:var(--tenue);white-space:nowrap}
 .evid.alta{color:var(--verde-scuro)}
 .evid.limitata{color:var(--ambra)}
+.da-tradurre{opacity:.55}
