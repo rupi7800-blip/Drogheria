@@ -90,6 +90,10 @@ function frasiConPercentuale(testo, max = 6) {
   return frasi.filter(f => /\d+(?:[.,]\d+)?\s?%/.test(f) && f.length < 320).slice(0, max);
 }
 
+function frasiUtili(testo, max = 4) {
+  return (testo || '').replace(/\s+/g, ' ').split(/(?<=[.;])\s+(?=[A-Z(])/).filter(f => f.length > 30 && f.length < 260).slice(0, max);
+}
+
 // Divide il testo semplice di Wikipedia (== Titolo ==) in sezioni
 function dividiSezioni(testo) {
   const out = []; let corrente = { titolo: '', corpo: '' };
@@ -250,6 +254,80 @@ async function studiPubMed(termine) {
   };
 }
 
+/* ---------- Cosa abbinare per ridurre gli effetti collaterali ---------- */
+
+// Abbinamenti e accorgimenti consolidati, per classe di principio attivo (informazione generale, non prescrizione).
+// evidenza: alta = linee guida / revisioni solide; moderata = studi concordi ma non definitivi; limitata = dati incerti.
+const ABBINAMENTI = [
+  { gruppo: 'Antinfiammatori (FANS)', cerca: /ibuprofen|naproxen|diclofenac|ketoprofen|aspirin|acetylsalicylic|celecoxib|indomethacin|ketorolac|nimesulide|etoricoxib|flurbiprofen/,
+    consigli: [
+      ['Prenderli a stomaco pieno, durante o dopo i pasti, con un bicchiere d\'acqua.', 'alta'],
+      ['Se l\'uso è prolungato o c\'è rischio per lo stomaco (età avanzata, ulcera, cortisonici, anticoagulanti): il medico può associare un protettore gastrico (inibitore di pompa come omeprazolo o pantoprazolo).', 'alta'],
+      ['Bere a sufficienza: aiuta a proteggere i reni.', 'moderata'],
+      ['Non associarli ad altri antinfiammatori e limitare l\'alcol.', 'alta'],
+    ] },
+  { gruppo: 'Paracetamolo', cerca: /acetaminophen|paracetamol/,
+    consigli: [
+      ['Rispettare la dose massima giornaliera del foglietto: il rischio principale è per il fegato.', 'alta'],
+      ['Controllare che altri prodotti (influenzali, antidolorifici) non contengano già paracetamolo.', 'alta'],
+      ['Evitare l\'alcol durante la terapia.', 'alta'],
+      ['In caso di sovradosaggio l\'antidoto è la N-acetilcisteina, ma si somministra solo in ospedale: va chiamato subito il pronto soccorso.', 'alta'],
+    ] },
+  { gruppo: 'Antibiotici', cerca: /amoxicillin|clavulan|azithromycin|clarithromycin|ciprofloxacin|levofloxacin|doxycycline|cefuroxime|cefixime|ceftriaxone|cefalexin|cephalexin|metronidazole|penicillin/,
+    consigli: [
+      ['Alcuni probiotici (come Saccharomyces boulardii e certi lattobacilli) riducono il rischio di diarrea da antibiotici.', 'moderata'],
+      ['Contro la nausea, molti antibiotici (es. amoxicillina con acido clavulanico) si tollerano meglio a inizio pasto.', 'moderata'],
+      ['Doxiciclina: molta acqua, non sdraiarsi subito dopo, e distanza da latticini, calcio, ferro e antiacidi.', 'alta'],
+      ['Finire il ciclo come prescritto, anche se si sta meglio.', 'alta'],
+    ] },
+  { gruppo: 'Metformina', cerca: /metformin/,
+    consigli: [
+      ['Prenderla durante i pasti e partire da dosi basse aumentando gradualmente: riduce i disturbi di stomaco e intestino.', 'alta'],
+      ['Con l\'uso lungo, far controllare periodicamente la vitamina B12.', 'alta'],
+    ] },
+  { gruppo: 'Statine', cerca: /statin\b|simvastatin|atorvastatin|rosuvastatin|pravastatin/,
+    consigli: [
+      ['Dolori muscolari insoliti vanno riferiti al medico, che può cambiare dose o molecola.', 'alta'],
+      ['Evitare il succo di pompelmo con simvastatina e atorvastatina.', 'alta'],
+      ['Il coenzima Q10 è spesso proposto per i dolori muscolari, ma i dati sono contrastanti.', 'limitata'],
+    ] },
+  { gruppo: 'Inibitori dell\'aromatasi', cerca: /letrozole|anastrozole|exemestane/,
+    consigli: [
+      ['Calcio e vitamina D, secondo le analisi, e controllo periodico della densità ossea (MOC): la terapia può assottigliare le ossa.', 'alta'],
+      ['Attività fisica regolare con carico (camminata, esercizi con pesi leggeri) per ossa, muscoli e dolori articolari.', 'alta'],
+    ] },
+  { gruppo: 'Cortisonici', cerca: /prednisone|prednisolone|betamethasone|dexamethasone|hydrocortisone|methylprednisolone|deflazacort/,
+    consigli: [
+      ['Prenderli al mattino e con il cibo.', 'alta'],
+      ['Se l\'uso dura settimane: calcio e vitamina D per le ossa, e controllo di glicemia e pressione.', 'alta'],
+      ['Con i FANS aumenta il rischio allo stomaco: chiedere al medico se serve un protettore gastrico.', 'alta'],
+      ['Non sospenderli di colpo dopo un uso prolungato: va ridotta la dose gradualmente.', 'alta'],
+    ] },
+  { gruppo: 'Benzodiazepine', cerca: /alprazolam|lorazepam|diazepam|bromazepam|clonazepam|zolpidem/,
+    consigli: [
+      ['Evitare alcol e altri sedativi: si potenziano a vicenda.', 'alta'],
+      ['Usarle per il tempo più breve possibile e non sospenderle di colpo.', 'alta'],
+      ['Attenzione alla guida e ai lavori di precisione, soprattutto all\'inizio.', 'alta'],
+    ] },
+  { gruppo: 'Melatonina', cerca: /melatonin/,
+    consigli: [
+      ['Dosi basse, 30–60 minuti prima di coricarsi: riducono sonnolenza al mattino e mal di testa.', 'moderata'],
+    ] },
+];
+
+const FRASE_ACCORGIMENTO = /(take|taken|given|administered?)\s+(with|after|before)\s+(food|meals?|milk|water)|\bto (reduce|minimi[sz]e|prevent|avoid|lessen)\b|\bshould (be taken|not be taken|be administered)|\bmay be (reduced|minimi[sz]ed)|\bcan be (reduced|minimi[sz]ed)/i;
+
+function abbinamenti(nomi, titolo) {
+  const chiavi = [...nomi, titolo || ''].map(normalizza).join(' | ');
+  return ABBINAMENTI.filter(g => g.cerca.test(chiavi))
+    .map(g => ({ gruppo: g.gruppo, consigli: g.consigli.map(([testo, evidenza]) => ({ testo, evidenza })) }));
+}
+
+function accorgimentiDaScheda(testo, max = 5) {
+  return (testo || '').replace(/\s+/g, ' ').split(/(?<=[.;])\s+(?=[A-Z(])/)
+    .filter(f => FRASE_ACCORGIMENTO.test(f) && f.length > 30 && f.length < 300).slice(0, max);
+}
+
 /* ---------- Estrazione dalla scheda FDA ---------- */
 
 const campo = (e, nome) => (e && e[nome] ? pulisciTesto(e[nome].join(' ')) : '');
@@ -265,6 +343,8 @@ function estraiScheda(e) {
     dose: campo(e, 'dosage_and_administration'),
     studi: (e.clinical_studies || []).join(' '),
     avverse: (e.adverse_reactions || []).join(' '),
+    accorgimenti: [e.dosage_and_administration, e.warnings, e.precautions, e.information_for_patients, e.adverse_reactions].map(x => (x || []).join(' ')).join(' '),
+    interazioni: (e.drug_interactions || []).join(' '),
   };
 }
 
@@ -372,6 +452,27 @@ function disegna(d) {
   eff.push(origine('openFDA (segnalazioni) · Wikipedia'));
   out.push(scheda('⚠️', 'Effetti collaterali', ...eff));
 
+  // 5b. Cosa abbinare per ridurre gli effetti collaterali
+  const gruppi = animale ? [] : abbinamenti(d.nomi || [], wiki ? wiki.titolo : '');
+  const accorg = accorgimentiDaScheda(sc ? sc.accorgimenti : '');
+  const interaz = frasiUtili(sc ? sc.interazioni : '', 4);
+  const corpo = [];
+  const livello = { alta: 'evidenza alta', moderata: 'evidenza moderata', limitata: 'evidenza limitata' };
+  for (const g of gruppi) {
+    corpo.push(crea('p', { class: 'sotto', text: g.gruppo + ':' }),
+      crea('ul', { class: 'pulito' }, g.consigli.map(c => crea('li', {}, c.testo + ' ', crea('span', { class: 'evid ' + c.evidenza, text: '(' + livello[c.evidenza] + ')' })))));
+  }
+  if (accorg.length) corpo.push(crea('details', {}, crea('summary', { text: 'Accorgimenti dalla scheda ufficiale (FDA, inglese)' }),
+    crea('ul', { class: 'pulito' }, accorg.map(f => crea('li', { text: f })))));
+  if (interaz.length) corpo.push(crea('details', {}, crea('summary', { text: 'Da evitare o usare con cautela insieme (FDA, inglese)' }),
+    crea('ul', { class: 'pulito' }, interaz.map(f => crea('li', { text: f })))));
+  if (!corpo.length) corpo.push(crea('p', { class: 'vuoto', text: animale
+    ? 'Per gli animali non propongo abbinamenti: dosi e prodotti per le persone possono essere pericolosi per cani, gatti e altre specie.'
+    : 'Non ho trovato abbinamenti documentati per questo prodotto nelle fonti consultate.' }));
+  out.push(scheda('🛡️', 'Cosa abbinare per ridurre gli effetti collaterali', ...corpo,
+    crea('p', { class: 'nota', text: 'Informazione generale, non una prescrizione. Nessun effetto collaterale si "annulla" con certezza: non aggiungere né sospendere farmaci o integratori senza il parere di medico, farmacista o veterinario, perché anche gli abbinamenti possono interagire. Se compaiono sintomi forti (difficoltà a respirare, gonfiore di viso o gola, sangue nelle feci, ittero), cerca subito assistenza medica.' }),
+    origine('linee guida e revisioni di uso comune · schede ufficiali FDA')));
+
   // 6. Farmaci simili
   out.push(scheda('🔁', 'Farmaci simili',
     simili && simili.simili.length
@@ -410,7 +511,7 @@ async function cerca(q, animale) {
   ]);
   const studi = await prova('PubMed', () => studiPubMed(nomi[0] || q));
 
-  Object.assign(contesto, { wiki, sc: ficha ? estraiScheda(ficha.etichetta) : null, reaz, simili, studi });
+  Object.assign(contesto, { nomi, wiki, sc: ficha ? estraiScheda(ficha.etichetta) : null, reaz, simili, studi });
   return contesto;
 }
 
@@ -456,5 +557,5 @@ if (typeof document !== 'undefined') {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { cercaWikipedia, ordinaCandidati, dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
+  module.exports = { abbinamenti, accorgimentiDaScheda, cercaWikipedia, ordinaCandidati, dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
 }
