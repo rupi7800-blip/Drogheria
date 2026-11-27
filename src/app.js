@@ -282,7 +282,7 @@ const ABBINAMENTI = [
     ] },
   { gruppo: 'Metronidazolo', cerca: /metronidazole|tinidazole/,
     consigli: [
-      ['Evitare l\'alcol durante la cura e per circa 48 ore dopo, come indicato nei foglietti: può causare nausea, vomito e malessere forte.', 'moderata'],
+      ['Evitare l\'alcol durante la cura e per almeno 3 giorni dopo la fine (così indica la scheda FDA; alcuni foglietti europei riportano tempi più brevi, ma è meglio il valore prudente): può causare nausea, vomito e malessere forte.', 'moderata'],
     ] },
   { gruppo: 'Fluorochinoloni (ciprofloxacina, levofloxacina)', cerca: /ciprofloxacin|levofloxacin|moxifloxacin|ofloxacin/,
     consigli: [
@@ -306,10 +306,10 @@ const ABBINAMENTI = [
       ['Calcio e vitamina D secondo i livelli nel sangue o le indicazioni del medico, e controllo periodico della densità ossea (mineralometria, MOC): la terapia può assottigliare le ossa.', 'alta'],
       ['Attività fisica regolare con carico (camminata, esercizi con pesi leggeri) per ossa, muscoli e dolori articolari.', 'alta'],
     ] },
-  { gruppo: 'Cortisonici', cerca: /prednisone|prednisolone|betamethasone|dexamethasone|hydrocortisone|methylprednisolone|deflazacort/,
+  { gruppo: 'Cortisonici (assunti per bocca o per iniezione, uso sistemico)', cerca: /prednisone|prednisolone|betamethasone|dexamethasone|hydrocortisone|methylprednisolone|deflazacort/,
     consigli: [
-      ['Prenderli al mattino e con il cibo.', 'alta'],
-      ['Se l\'uso dura settimane: calcio e vitamina D per le ossa, e controllo di glicemia e pressione.', 'alta'],
+      ['Se si prendono per bocca una volta al giorno, di solito al mattino e con il cibo, salvo diversa indicazione del medico (nelle terapie sostitutive la dose può essere divisa nella giornata).', 'alta'],
+      ['Se l\'uso sistemico dura settimane: calcio e vitamina D per le ossa, e controllo di glicemia e pressione.', 'alta'],
       ['Con i FANS aumenta il rischio allo stomaco: chiedere al medico se serve un protettore gastrico.', 'alta'],
       ['Non sospenderli di colpo dopo un uso prolungato: va ridotta la dose gradualmente.', 'alta'],
     ] },
