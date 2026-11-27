@@ -140,15 +140,18 @@ function ordinaCandidati(q, hits) {
 }
 
 async function cercaWikipedia(q) {
-  let riserva = null;
+  let riserva = null, errore = null;
   for (const lang of ['it', 'en']) {
-    const j = await getJSON(wikiURL(lang, { action: 'query', list: 'search', srsearch: q, srlimit: '8', srprop: 'snippet' }));
-    const hits = ((j.query && j.query.search) || []).map(h => ({ titolo: h.title, snippet: (h.snippet || '').replace(/<[^>]+>/g, '') }));
-    const ordinati = ordinaCandidati(q, hits);
-    if (ordinati.length && ordinati[0].punti >= 10) return { lang, candidati: ordinati };
-    // nessun segnale chiaro: tengo il primo gruppo di risultati come riserva, senza scartare l'intera ricerca
-    if (!riserva && hits.length) riserva = { lang, candidati: ordinati.length ? ordinati : hits };
+    try {
+      const j = await getJSON(wikiURL(lang, { action: 'query', list: 'search', srsearch: q, srlimit: '8', srprop: 'snippet' }));
+      const hits = ((j.query && j.query.search) || []).map(h => ({ titolo: h.title, snippet: (h.snippet || '').replace(/<[^>]+>/g, '') }));
+      const ordinati = ordinaCandidati(q, hits);   // già senza pagine di persone
+      if (ordinati.length && ordinati[0].punti >= 10) return { lang, candidati: ordinati };
+      // nessun segnale chiaro: tengo come riserva solo risultati già filtrati
+      if (!riserva && ordinati.length) riserva = { lang, candidati: ordinati };
+    } catch (e) { errore = errore || e; }
   }
+  if (!riserva && errore) throw errore;   // nessuna lingua ha risposto: la fonte risulta non raggiungibile
   return riserva;
 }
 
@@ -453,5 +456,5 @@ if (typeof document !== 'undefined') {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { ordinaCandidati, dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
+  module.exports = { cercaWikipedia, ordinaCandidati, dividiSezioni, trovaSezione, frasiConPercentuale, nomiPerFDA, estraiScheda, pulisciTesto, SEZIONI_WIKI, cerca };
 }
