@@ -7,6 +7,14 @@ Per ogni ricerca mostra: principio attivo, meccanismo d'azione, modo d'uso, a co
 ## Uso
 Nessuna installazione: apri `index.html` nel browser, oppure pubblica la cartella con GitHub Pages.
 
+## Installazione su Android
+L'app è installabile (PWA): non serve nessun negozio di applicazioni.
+1. Apri l'indirizzo dell'app con **Chrome** su Android (con GitHub Pages: `https://rupi7800-blip.github.io/Drogheria/`).
+2. Tocca **«📲 Installa l'app sul telefono»** in fondo alla pagina, oppure il menu ⋮ → **Installa app** / **Aggiungi a schermata Home**.
+3. L'icona «Drogheria» compare tra le app e si apre a schermo intero. La parte grafica funziona anche senza rete; le ricerche richiedono la connessione.
+
+Per un file **APK** vero e proprio (per distribuirlo fuori dal browser) si può generare dall'indirizzo pubblico con [PWABuilder](https://www.pwabuilder.com): richiede solo l'indirizzo dell'app e produce un pacchetto Android firmato.
+
 ## Fonti (aperte, interrogate dal browser)
 - Wikipedia (it/en): descrizione, meccanismo, uso, effetti
 - openFDA: schede ufficiali, segnalazioni di reazioni avverse (anche veterinarie)

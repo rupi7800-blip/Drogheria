@@ -67,3 +67,7 @@ a{color:var(--verde-scuro)}
 .evid.limitata{color:var(--ambra)}
 .da-tradurre{opacity:.55}
 .origine a{color:var(--verde-scuro)}
+
+.installa{max-width:760px;margin:0 auto 18px;padding:0 16px;text-align:center}
+.installa button{font:inherit;font-weight:600;padding:11px 22px;border:0;border-radius:14px;background:var(--verde);color:#fff;cursor:pointer}
+.installa p{margin:0;font-size:.86rem;color:var(--tenue)}
